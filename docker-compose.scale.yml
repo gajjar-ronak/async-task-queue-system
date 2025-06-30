@@ -1,0 +1,37 @@
+version: '3.8'
+
+# This compose file is used for horizontal scaling scenarios
+# Use: docker-compose -f docker-compose.yml -f docker-compose.scale.yml up --scale worker-service=3
+
+services:
+  # Override worker service for scaling
+  worker-service:
+    build:
+      context: .
+      dockerfile: services/worker-service/Dockerfile
+    # No port mapping - workers communicate internally via Docker networking
+    environment:
+      - NODE_ENV=production
+      - WORKER_SERVICE_PORT=3003
+      - DATABASE_URL=postgresql://async_task_user:async_task_password@postgres:5432/async_task_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_NODE_ID=${HOSTNAME:-worker-${RANDOM}}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-5}
+      - SCALING_MODE=true
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - async-task-network
+    restart: unless-stopped
+    deploy:
+      replicas: 1  # This will be overridden by --scale parameter

@@ -1,0 +1,8 @@
+/node_modules
+# Keep environment variables out of version control
+.env
+
+# Prisma generated files
+services/app-service/generated/prisma
+services/worker-service/generated/prisma
+packages/shared/generated/prisma

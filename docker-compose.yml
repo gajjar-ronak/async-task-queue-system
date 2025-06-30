@@ -1,0 +1,121 @@
+version: '3.8'
+
+# Distributed Async Task Queue System
+# After starting with 'docker-compose up', access the application at:
+# - Main API: http://localhost:3002
+# - Dashboard: http://localhost:3002/dashboard.html
+# - PostgreSQL: localhost:5433
+# - Redis: localhost:6379
+
+services:
+  # Redis for queue management
+  redis:
+    image: redis:7-alpine
+    container_name: async-task-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - async-task-network
+
+  # PostgreSQL for persistent data (replacing SQLite for distributed setup)
+  postgres:
+    image: postgres:15-alpine
+    container_name: async-task-postgres
+    environment:
+      POSTGRES_DB: async_task_db
+      POSTGRES_USER: async_task_user
+      POSTGRES_PASSWORD: async_task_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U async_task_user -d async_task_db"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - async-task-network
+
+  # App Service (API and Dashboard)
+  # Access the application at: http://localhost:3002
+  # Dashboard available at: http://localhost:3002/dashboard.html
+  app-service:
+    build:
+      context: .
+      dockerfile: services/app-service/Dockerfile
+    container_name: async-task-app
+    ports:
+      - "3002:3002"  # Host:Container - App runs on port 3002
+    env_file:
+      - .env.docker
+    environment:
+      - NODE_ENV=production
+      - APP_SERVICE_PORT=3002
+      - DATABASE_URL=postgresql://async_task_user:async_task_password@postgres:5432/async_task_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_SERVICE_URL=http://worker-service:3003
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - async-task-network
+    restart: unless-stopped
+
+  # Worker Service (Single instance - can be scaled)
+  worker-service:
+    build:
+      context: .
+      dockerfile: services/worker-service/Dockerfile
+    # No port mapping - workers communicate internally via Docker networking
+    env_file:
+      - .env.docker
+    environment:
+      - NODE_ENV=production
+      - WORKER_SERVICE_PORT=3003
+      - DATABASE_URL=postgresql://async_task_user:async_task_password@postgres:5432/async_task_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_NODE_ID=${WORKER_NODE_ID:-worker-1}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-5}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - async-task-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  async-task-network:
+    driver: bridge

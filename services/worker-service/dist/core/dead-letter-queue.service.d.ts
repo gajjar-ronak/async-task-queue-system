@@ -1,0 +1,111 @@
+import { PrismaService, DlqStatus, DlqTaskData, DlqStats } from '@distributed-async-task-worker/shared';
+import { QueueManagerService } from '../queue/queue-manager.service';
+export interface ReprocessResult {
+    success: boolean;
+    taskId?: string;
+    error?: string;
+}
+export declare class DeadLetterQueueService {
+    private prismaService;
+    private queueManagerService;
+    private readonly logger;
+    constructor(prismaService: PrismaService, queueManagerService: QueueManagerService);
+    moveTaskToDlq(taskData: DlqTaskData): Promise<string>;
+    getDlqStats(): Promise<DlqStats>;
+    getDlqTasks(options?: {
+        page?: number;
+        limit?: number;
+        status?: DlqStatus;
+        type?: string;
+        failureReason?: string;
+        sortBy?: 'movedToDlqAt' | 'originalCreatedAt' | 'attempts';
+        sortOrder?: 'asc' | 'desc';
+    }): Promise<{
+        tasks: {
+            name: string;
+            type: string;
+            priority: number;
+            attempts: number;
+            id: string;
+            originalTaskId: string;
+            workflowId: string | null;
+            payload: import("@prisma/client/runtime/library").JsonValue | null;
+            maxAttempts: number;
+            lastError: string;
+            lastErrorStack: string | null;
+            failureReason: string | null;
+            originalCreatedAt: Date;
+            firstFailedAt: Date;
+            movedToDlqAt: Date;
+            retryHistory: import("@prisma/client/runtime/library").JsonValue | null;
+            processingMetadata: import("@prisma/client/runtime/library").JsonValue | null;
+            status: import(".prisma/client").$Enums.DlqStatus;
+            reprocessedAt: Date | null;
+            reprocessedBy: string | null;
+            notes: string | null;
+            createdAt: Date;
+            updatedAt: Date;
+        }[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+    }>;
+    getDlqTask(dlqTaskId: string): Promise<{
+        name: string;
+        type: string;
+        priority: number;
+        attempts: number;
+        id: string;
+        originalTaskId: string;
+        workflowId: string | null;
+        payload: import("@prisma/client/runtime/library").JsonValue | null;
+        maxAttempts: number;
+        lastError: string;
+        lastErrorStack: string | null;
+        failureReason: string | null;
+        originalCreatedAt: Date;
+        firstFailedAt: Date;
+        movedToDlqAt: Date;
+        retryHistory: import("@prisma/client/runtime/library").JsonValue | null;
+        processingMetadata: import("@prisma/client/runtime/library").JsonValue | null;
+        status: import(".prisma/client").$Enums.DlqStatus;
+        reprocessedAt: Date | null;
+        reprocessedBy: string | null;
+        notes: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    reprocessDlqTask(dlqTaskId: string, reprocessedBy?: string): Promise<ReprocessResult>;
+    reprocessDlqTasks(dlqTaskIds: string[], reprocessedBy?: string): Promise<ReprocessResult[]>;
+    archiveDlqTask(dlqTaskId: string, notes?: string): Promise<void>;
+    cleanupArchivedTasks(olderThanDays?: number): Promise<number>;
+    updateDlqTaskNotes(dlqTaskId: string, notes: string): Promise<void>;
+    getDlqTaskByOriginalId(originalTaskId: string): Promise<{
+        name: string;
+        type: string;
+        priority: number;
+        attempts: number;
+        id: string;
+        originalTaskId: string;
+        workflowId: string | null;
+        payload: import("@prisma/client/runtime/library").JsonValue | null;
+        maxAttempts: number;
+        lastError: string;
+        lastErrorStack: string | null;
+        failureReason: string | null;
+        originalCreatedAt: Date;
+        firstFailedAt: Date;
+        movedToDlqAt: Date;
+        retryHistory: import("@prisma/client/runtime/library").JsonValue | null;
+        processingMetadata: import("@prisma/client/runtime/library").JsonValue | null;
+        status: import(".prisma/client").$Enums.DlqStatus;
+        reprocessedAt: Date | null;
+        reprocessedBy: string | null;
+        notes: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+}

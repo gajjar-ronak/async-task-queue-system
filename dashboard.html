@@ -1,0 +1,2347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Async Task Worker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #007AFF;
+            --secondary-color: #5856D6;
+            --success-color: #34C759;
+            --warning-color: #FF9500;
+            --error-color: #FF3B30;
+            --background-primary: #FAFAFA;
+            --background-secondary: #FFFFFF;
+            --background-tertiary: #F8F9FA;
+            --text-primary: #2C2C2E;
+            --text-secondary: #8E8E93;
+            --text-tertiary: #C7C7CC;
+            --border-color: #E5E5EA;
+            --border-light: #F2F2F7;
+            --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-heavy: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --border-radius: 12px;
+            --border-radius-small: 8px;
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .header {
+            background: var(--background-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-lg) var(--spacing-xl);
+            box-shadow: var(--shadow-light);
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            color: var(--text-primary);
+        }
+
+        .header h1::before {
+            content: "⚡";
+            font-size: 32px;
+            color: var(--primary-color);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-xl);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .card {
+            background: var(--background-secondary);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-light);
+            border: 1px solid var(--border-light);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-medium);
+            transform: translateY(-1px);
+            border-color: var(--border-color);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary-color);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .second-card {
+            margin-top: var(--spacing-lg);
+        }
+
+        .card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: var(--spacing-lg);
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric:hover {
+            background-color: var(--background-tertiary);
+            margin: 0 calc(-1 * var(--spacing-md));
+            padding-left: var(--spacing-md);
+            padding-right: var(--spacing-md);
+            border-radius: var(--border-radius-small);
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 17px;
+            color: var(--text-primary);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: var(--spacing-sm);
+            box-shadow: 0 0 0 2px var(--background-secondary);
+        }
+
+        .status-healthy {
+            background: var(--success-color);
+        }
+        .status-warning {
+            background: var(--warning-color);
+        }
+        .status-error {
+            background: var(--error-color);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 320px;
+            margin-top: var(--spacing-lg);
+            background: var(--background-tertiary);
+            border-radius: var(--border-radius-small);
+            padding: var(--spacing-md);
+            border: 1px solid var(--border-light);
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .stress-test-floating {
+            position: fixed;
+            top: 50%;
+            right: var(--spacing-xl);
+            transform: translateY(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: var(--spacing-md);
+        }
+
+        .stress-test-quick-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: var(--shadow-medium);
+            white-space: nowrap;
+            border: 1px solid var(--border-light);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stress-test-quick-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .stress-test-quick-btn:hover::before {
+            left: 100%;
+        }
+
+        .stress-test-quick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-heavy);
+            background: #0056CC;
+        }
+
+        .stress-test-quick-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .stress-test-quick-btn:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: var(--shadow-light);
+            opacity: 0.6;
+        }
+
+        .stress-test-mini-status {
+            background: var(--background-secondary);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-md) var(--spacing-lg);
+            box-shadow: var(--shadow-medium);
+            min-width: 180px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .mini-progress {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-xs);
+            letter-spacing: -0.3px;
+        }
+
+        .mini-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .overview-card {
+            background: var(--background-tertiary);
+            padding: var(--spacing-lg);
+            border-radius: var(--border-radius);
+            text-align: center;
+            border: 1px solid var(--border-light);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .overview-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-medium);
+            border-color: var(--border-color);
+            background: var(--background-secondary);
+        }
+
+        .overview-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary-color);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .overview-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .overview-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .overview-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            margin-top: var(--spacing-xl);
+            padding: var(--spacing-md) var(--spacing-lg);
+            background: var(--background-secondary);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-light);
+            border: 1px solid var(--border-color);
+        }
+
+        .auto-refresh-status {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            color: var(--success-color);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .auto-refresh-status::before {
+            content: "●";
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .last-updated {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Task List Styling */
+        .task-item {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            border-radius: var(--border-radius-small);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .task-item:hover {
+            background-color: var(--background-tertiary);
+            border-color: var(--border-color);
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .task-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .task-status-badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .task-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-xs);
+        }
+
+        .task-meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        /* Workflow List Styling */
+        .workflow-item {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            border-radius: var(--border-radius-small);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .workflow-item:hover {
+            background-color: var(--background-tertiary);
+            border-color: var(--border-color);
+        }
+
+        .workflow-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .workflow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .workflow-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .workflow-status-badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .workflow-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.4;
+        }
+
+        .workflow-meta {
+            display: flex;
+            gap: var(--spacing-md);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* DLQ Task List Styling */
+        .dlq-item {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            border-radius: var(--border-radius-small);
+            margin-bottom: var(--spacing-sm);
+            border-left: 4px solid var(--error-color);
+        }
+
+        .dlq-item:hover {
+            background-color: var(--background-tertiary);
+            border-color: var(--border-color);
+        }
+
+        .dlq-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .dlq-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .dlq-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .dlq-status-badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dlq-error {
+            font-size: 13px;
+            color: var(--error-color);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.4;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            background: rgba(255, 59, 48, 0.1);
+            padding: var(--spacing-xs);
+            border-radius: var(--border-radius-small);
+        }
+
+        .dlq-meta {
+            display: flex;
+            gap: var(--spacing-md);
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .dlq-meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .failure-breakdown-item {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .failure-breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .failure-reason {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .failure-count {
+            font-weight: 600;
+            color: var(--error-color);
+            background: rgba(255, 59, 48, 0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        /* Empty State Styling */
+        .empty-state {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: var(--spacing-xl);
+            font-style: italic;
+        }
+
+        .error-state {
+            color: var(--error-color);
+            text-align: center;
+            padding: var(--spacing-xl);
+            font-weight: 500;
+        }
+
+        /* Task List Styles */
+        .task-section {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .task-section h4 {
+            margin: 0;
+            font-size: 16px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .pagination-btn {
+            background: var(--background-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 0 var(--spacing-xs);
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .task-item {
+            padding: var(--spacing-sm);
+            background: var(--background-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .task-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .task-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .task-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .task-status.completed {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .task-status.processing {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .task-status.pending {
+            background: var(--info-color);
+            color: white;
+        }
+
+        .task-status.failed {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .task-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .task-detail {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .task-type-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .branching-type-badge {
+            background: #8b5cf6;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .dependency-badge {
+            background: #06b6d4;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .dependency-chain {
+            margin-top: var(--spacing-xs);
+            padding: var(--spacing-xs);
+            background: rgba(6, 182, 212, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #06b6d4;
+        }
+
+        .dependency-flow {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .dependency-arrow {
+            color: #06b6d4;
+            font-weight: bold;
+        }
+
+        .parallel-group {
+            margin-top: var(--spacing-xs);
+            padding: var(--spacing-xs);
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .parallel-info {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .task-relationship {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 4px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--spacing-md);
+            }
+
+            .header {
+                padding: var(--spacing-md) var(--spacing-lg);
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+
+            .overview-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: var(--spacing-sm);
+            }
+
+            .stress-test-floating {
+                right: var(--spacing-md);
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Async Task Worker Dashboard</h1>
+    </div>
+    
+    <div class="container">
+        <div class="grid">
+            <!-- Task Status Trends -->
+            <div class="card">
+                <h3>� Task Status Trends</h3>
+                <div class="chart-container">
+                    <canvas id="taskStatusChart"></canvas>
+                </div>
+            </div>
+            <!-- System Health Section -->
+            <div class="card">
+                <h3>� System Health</h3>
+                <div class="metric">
+                    <span class="metric-label">
+                        <span class="status-indicator" id="healthIndicator"></span>
+                        Overall Status
+                    </span>
+                    <span class="metric-value" id="healthStatus">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Database Connection</span>
+                    <span class="metric-value" id="dbStatus">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Redis Connection</span>
+                    <span class="metric-value" id="redisStatus">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Worker Node</span>
+                    <span class="metric-value" id="workerStatus">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Overview Section -->
+        <div class="card">
+            <h3>� Task Overview</h3>
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="overview-label">Total Tasks</div>
+                    <div class="overview-value" id="totalTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Completed</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="completedTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Failed</div>
+                    <div class="overview-value" style="color: var(--error-color);" id="failedTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Processing</div>
+                    <div class="overview-value" style="color: var(--warning-color);" id="processingTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Pending</div>
+                    <div class="overview-value" style="color: var(--primary-color);" id="pendingTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Success Rate</div>
+                    <div class="overview-value" id="successRate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Metrics Section -->
+        <div class="card second-card">
+            <h3>⚡ Performance Metrics</h3>
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="overview-label">Active Nodes</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="activeNodes">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Avg Processing</div>
+                    <div class="overview-value" style="color: var(--primary-color);" id="avgProcessingTime">0ms</div>
+                </div>
+                <!-- <div class="overview-card">
+                    <div class="overview-label">Tasks/Second</div>
+                    <div class="overview-value" style="color: var(--warning-color);" id="tasksPerSecond">0.0</div>
+                </div> -->
+                <div class="overview-card">
+                    <div class="overview-label">System Load</div>
+                    <div class="overview-value" style="color: var(--secondary-color);" id="systemLoad">Low</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CRON Jobs Section -->
+        <div class="card second-card">
+            <h3>⏰ CRON Jobs</h3>
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="overview-label">Total Jobs</div>
+                    <div class="overview-value" style="color: var(--primary-color);" id="cronTotalJobs">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Enabled</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="cronEnabledJobs">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Disabled</div>
+                    <div class="overview-value" style="color: var(--text-secondary);" id="cronDisabledJobs">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Executions</div>
+                    <div class="overview-value" style="color: var(--warning-color);" id="cronTotalExecutions">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Success Rate</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="cronSuccessRate">0%</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Avg Exec Time</div>
+                    <div class="overview-value" style="color: var(--secondary-color);" id="cronAvgExecTime">0ms</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dead Letter Queue Section -->
+        <div class="card second-card">
+            <h3>💀 Dead Letter Queue</h3>
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="overview-label">Total Failed</div>
+                    <div class="overview-value" style="color: var(--error-color);" id="dlqTotalTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Pending Review</div>
+                    <div class="overview-value" style="color: var(--warning-color);" id="dlqPendingTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Reprocessing</div>
+                    <div class="overview-value" style="color: var(--primary-color);" id="dlqReprocessingTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Resolved</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="dlqResolvedTasks">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Archived</div>
+                    <div class="overview-value" style="color: var(--text-secondary);" id="dlqArchivedTasks">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auto-Scaling Section -->
+        <div class="card second-card">
+            <h3>🚀 Auto-Scaling</h3>
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <div class="overview-label">Active Nodes</div>
+                    <div class="overview-value" style="color: var(--primary-color);" id="autoScalingNodes">1</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Scale Up Threshold</div>
+                    <div class="overview-value" style="color: var(--warning-color);" id="autoScalingUpThreshold">50</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Scale Down Threshold</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="autoScalingDownThreshold">10</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Cooldown</div>
+                    <div class="overview-value" style="color: var(--text-secondary);" id="autoScalingCooldown">0s</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Recent Events</div>
+                    <div class="overview-value" style="color: var(--secondary-color);" id="autoScalingEvents">0</div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Status</div>
+                    <div class="overview-value" style="color: var(--success-color);" id="autoScalingStatus">Active</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simplified Stress Test Button -->
+        <div class="stress-test-floating">
+            <button type="button" class="stress-test-quick-btn" id="quickStressTest" title="Run Stress Test (1000 tasks)">
+                🚀 Stress Test
+            </button>
+            <div class="stress-test-mini-status" id="miniStatus" style="display: none;">
+                <div class="mini-progress">
+                    <span id="miniTasksCreated">0</span>/<span id="miniTotalTasks">1000</span>
+                </div>
+                <div class="mini-message" id="miniMessage">Starting...</div>
+            </div>
+        </div>
+
+        <div class="auto-refresh">
+            <span class="last-updated" id="lastUpdated"></span>
+            <span class="auto-refresh-status">Auto-refresh every 2 seconds</span>
+        </div>
+
+        <div class="grid">
+            <!-- Task Types Distribution -->
+            <div class="card">
+                <h3>🍩 Task Types Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="taskTypesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Priority Distribution Chart -->
+            <div class="card">
+                <h3>📊 Priority Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Recent Tasks -->
+            <div class="card">
+                <h3>� Recent Tasks</h3>
+                <div id="recentTasksList" style="max-height: 320px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+
+            <!-- Workflows -->
+            <div class="card">
+                <h3>🔄 Active Workflows</h3>
+                <div id="workflowsList" style="max-height: 320px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Dead Letter Queue Tasks -->
+        <div class="grid">
+            <div class="card">
+                <h3>💀 Failed Tasks (Dead Letter Queue)</h3>
+                <div id="dlqTasksList" style="max-height: 400px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+
+            <!-- DLQ Failure Breakdown -->
+            <div class="card">
+                <h3>📊 Failure Analysis</h3>
+                <div id="dlqFailureBreakdown" style="max-height: 400px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- CRON Jobs List -->
+        <div class="grid">
+            <div class="card">
+                <h3>⏰ CRON Jobs Status</h3>
+                <div id="cronJobsList" style="max-height: 400px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+
+            <!-- Recent CRON Executions -->
+            <div class="card">
+                <h3>📋 Recent CRON Executions</h3>
+                <div id="cronExecutionsList" style="max-height: 400px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+            <!-- Recent Auto-Scaling Events -->
+            <div class="card">
+                <h3>📊 Recent Scaling Events</h3>
+                <div id="autoScalingEventsList" style="max-height: 400px; overflow-y: auto; padding: var(--spacing-sm);">
+                    Loading...
+                </div>
+            </div>
+
+            <div class="grid">
+                <!-- Recent Branching & Dependent Tasks -->
+                <div class="card second-card">
+                    <h3>🌳 Recent Branching & Dependent Tasks</h3>
+            
+                    <!-- Branching Tasks Section -->
+                    <div class="task-section">
+                        <div class="section-header">
+                            <h4>🔀 Recent Branching Tasks</h4>
+                            <div class="pagination-controls" id="branchingPagination">
+                                <button class="pagination-btn" id="branchingPrevBtn" disabled>‹ Prev</button>
+                                <span class="pagination-info" id="branchingPageInfo">Page 1 of 1</span>
+                                <button class="pagination-btn" id="branchingNextBtn" disabled>Next ›</button>
+                            </div>
+                        </div>
+                        <div id="branchingTasksList" class="task-list">
+                            <div class="loading-state">Loading branching tasks...</div>
+                        </div>
+                    </div>
+            
+                    <!-- Dependent Tasks Section -->
+                    <div class="task-section">
+                        <div class="section-header">
+                            <h4>⛓️ Recent Dependent Tasks</h4>
+                            <div class="pagination-controls" id="dependentPagination">
+                                <button class="pagination-btn" id="dependentPrevBtn" disabled>‹ Prev</button>
+                                <span class="pagination-info" id="dependentPageInfo">Page 1 of 1</span>
+                                <button class="pagination-btn" id="dependentNextBtn" disabled>Next ›</button>
+                            </div>
+                        </div>
+                        <div id="dependentTasksList" class="task-list">
+                            <div class="loading-state">Loading dependent tasks...</div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+        </div>
+    </div>
+
+    <script>
+        let taskStatusChart, taskTypesChart, priorityChart;
+        let autoRefreshInterval;
+        let taskStatusData = [];
+        let currentStressTest = null;
+        let stressTestInterval = null;
+
+        // Initialize charts
+        function initCharts() {
+            // Task Status Trends Chart
+            const statusCtx = document.getElementById('taskStatusChart').getContext('2d');
+            taskStatusChart = new Chart(statusCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Completed',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Processing',
+                        data: [],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Pending',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Failed',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Number of Tasks'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Task Types Distribution Chart
+            const typesCtx = document.getElementById('taskTypesChart').getContext('2d');
+            taskTypesChart = new Chart(typesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+                            '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} tasks (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Priority Distribution Chart
+            const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+            priorityChart = new Chart(priorityCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['High Priority (8-10)', 'Medium Priority (4-7)', 'Low Priority (0-3)'],
+                    datasets: [{
+                        label: 'Number of Tasks',
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            '#ef4444', // Red for high priority
+                            '#f59e0b', // Orange for medium priority
+                            '#10b981'  // Green for low priority
+                        ],
+                        borderColor: [
+                            '#dc2626',
+                            '#d97706',
+                            '#059669'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed.y;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} tasks (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Tasks'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Priority Level'
+                            }
+                        }
+                    }
+                }
+            });
+
+
+        }
+
+        // Update task status chart with new data
+        function updateTaskStatusChart(data) {
+            const now = new Date().toLocaleTimeString();
+
+            // Add new data point
+            taskStatusData.push({
+                time: now,
+                completed: data.completed || 0,
+                processing: data.processing || 0,
+                pending: data.pending || 0,
+                failed: data.failed || 0
+            });
+
+            // Keep only last 20 data points
+            if (taskStatusData.length > 20) {
+                taskStatusData.shift();
+            }
+
+            // Update chart
+            taskStatusChart.data.labels = taskStatusData.map(d => d.time);
+            taskStatusChart.data.datasets[0].data = taskStatusData.map(d => d.completed);
+            taskStatusChart.data.datasets[1].data = taskStatusData.map(d => d.processing);
+            taskStatusChart.data.datasets[2].data = taskStatusData.map(d => d.pending);
+            taskStatusChart.data.datasets[3].data = taskStatusData.map(d => d.failed);
+            taskStatusChart.update('none');
+        }
+
+        // Update task types chart
+        async function updateTaskTypesChart() {
+            try {
+                const response = await fetch('http://localhost:3002/tasks/stats');
+                const data = await response.json();
+
+                if (data.taskTypeStats && data.taskTypeStats.byType) {
+                    const typeCounts = data.taskTypeStats.byType;
+                    const labels = Object.keys(typeCounts);
+                    const counts = Object.values(typeCounts);
+
+                    taskTypesChart.data.labels = labels;
+                    taskTypesChart.data.datasets[0].data = counts;
+                    taskTypesChart.update('none');
+
+                    // Update branching and dependent task lists
+                    updateBranchingAndDependentTasks();
+                }
+            } catch (error) {
+                console.error('Error loading task types:', error);
+            }
+        }
+
+        // Pagination state
+        let branchingCurrentPage = 1;
+        let dependentCurrentPage = 1;
+        const tasksPerPage = 5;
+
+        // Update branching and dependent task lists
+        async function updateBranchingAndDependentTasks() {
+            try {
+                await Promise.all([
+                    updateBranchingTasks(),
+                    updateDependentTasks()
+                ]);
+            } catch (error) {
+                console.error('Error loading branching and dependent tasks:', error);
+                document.getElementById('branchingTasksList').innerHTML = '<div class="empty-state">Error loading branching tasks</div>';
+                document.getElementById('dependentTasksList').innerHTML = '<div class="empty-state">Error loading dependent tasks</div>';
+            }
+        }
+
+        async function updateBranchingTasks() {
+            const response = await fetch(`http://localhost:3002/tasks/recent-branching-dependent?page=${branchingCurrentPage}&limit=${tasksPerPage}`);
+            const data = await response.json();
+
+            updateTaskList('branchingTasksList', data.branchingTasks, 'branching');
+            updatePaginationControls('branching', data.pagination.branchingTasks);
+        }
+
+        async function updateDependentTasks() {
+            const response = await fetch(`http://localhost:3002/tasks/recent-branching-dependent?page=${dependentCurrentPage}&limit=${tasksPerPage}`);
+            const data = await response.json();
+
+            updateTaskList('dependentTasksList', data.dependentTasks, 'dependent');
+            updatePaginationControls('dependent', data.pagination.dependentTasks);
+        }
+
+        // Update a specific task list
+        function updateTaskList(containerId, tasks, category) {
+            const container = document.getElementById(containerId);
+
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = `<div class="empty-state">No recent ${category} tasks found</div>`;
+                return;
+            }
+
+            const tasksHtml = tasks.map(task => {
+                const createdTime = new Date(task.createdAt).toLocaleString();
+                const completedTime = task.completedAt ? new Date(task.completedAt).toLocaleString() : 'N/A';
+                const duration = task.completedAt ?
+                    `${Math.round((new Date(task.completedAt) - new Date(task.createdAt)) / 1000)}s` : 'N/A';
+
+                let relationshipHtml = '';
+
+                if (category === 'branching' && task.branchingDetails) {
+                    relationshipHtml = `
+                        <div class="parallel-group">
+                            <div class="parallel-info">
+                                <strong>${task.branchingDetails.description}</strong>
+                            </div>
+                            ${task.branchingDetails.type === 'parallel' ?
+                                `<div class="task-relationship">
+                                    🔀 Parallel execution with ${task.branchingDetails.totalParallel - 1} other tasks
+                                </div>` : ''
+                            }
+                        </div>
+                    `;
+                } else if (category === 'dependent' && task.dependencyDetails) {
+                    const details = task.dependencyDetails;
+                    relationshipHtml = `
+                        <div class="dependency-chain">
+                            <div class="dependency-info">
+                                <strong>${details.description}</strong>
+                            </div>
+                            ${details.previousStep || details.nextStep ? `
+                                <div class="dependency-flow">
+                                    ${details.previousStep ? `${details.previousStep}` : 'START'}
+                                    <span class="dependency-arrow">→</span>
+                                    <strong>${task.name.split(' - ')[0]}</strong>
+                                    <span class="dependency-arrow">→</span>
+                                    ${details.nextStep ? `${details.nextStep}` : 'END'}
+                                </div>
+                            ` : ''}
+                            <div class="task-relationship">
+                                ${details.isFirst ? '🟢 First task in chain' :
+                                  details.isLast ? '🔴 Last task in chain' :
+                                  '🟡 Middle task in chain'}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="task-item">
+                        <div class="task-header">
+                            <div class="task-name">${task.name}</div>
+                            <div class="task-status ${task.status.toLowerCase()}">${task.status}</div>
+                        </div>
+                        <div class="task-details">
+                            <div class="task-detail">
+                                <span class="task-type-badge">${task.type}</span>
+                            </div>
+                            ${category === 'branching' ?
+                                `<div class="task-detail"><span class="branching-type-badge">${task.branchingType}</span></div>` :
+                                `<div class="task-detail"><span class="dependency-badge">${task.dependencyInfo}</span></div>`
+                            }
+                            <div class="task-detail">
+                                📅 Created: ${createdTime}
+                            </div>
+                            ${task.completedAt ?
+                                `<div class="task-detail">✅ Completed: ${completedTime}</div>` : ''
+                            }
+                            <div class="task-detail">
+                                ⏱️ Duration: ${duration}
+                            </div>
+                            <div class="task-detail">
+                                🔄 Attempts: ${task.attempts}/${task.maxAttempts}
+                            </div>
+                            ${task.workflowId ?
+                                `<div class="task-detail">🔗 Workflow: ${task.workflowId.substring(0, 8)}...</div>` : ''
+                            }
+                        </div>
+                        ${relationshipHtml}
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = tasksHtml;
+        }
+
+        // Update pagination controls
+        function updatePaginationControls(type, pagination) {
+            const prevBtn = document.getElementById(`${type}PrevBtn`);
+            const nextBtn = document.getElementById(`${type}NextBtn`);
+            const pageInfo = document.getElementById(`${type}PageInfo`);
+
+            prevBtn.disabled = !pagination.hasPrev;
+            nextBtn.disabled = !pagination.hasNext;
+            pageInfo.textContent = `Page ${pagination.currentPage} of ${pagination.totalPages}`;
+        }
+
+        // Initialize pagination event listeners
+        function initializePagination() {
+            // Branching tasks pagination
+            document.getElementById('branchingPrevBtn').addEventListener('click', () => {
+                if (branchingCurrentPage > 1) {
+                    branchingCurrentPage--;
+                    updateBranchingTasks();
+                }
+            });
+
+            document.getElementById('branchingNextBtn').addEventListener('click', () => {
+                branchingCurrentPage++;
+                updateBranchingTasks();
+            });
+
+            // Dependent tasks pagination
+            document.getElementById('dependentPrevBtn').addEventListener('click', () => {
+                if (dependentCurrentPage > 1) {
+                    dependentCurrentPage--;
+                    updateDependentTasks();
+                }
+            });
+
+            document.getElementById('dependentNextBtn').addEventListener('click', () => {
+                dependentCurrentPage++;
+                updateDependentTasks();
+            });
+        }
+
+        // Update health status
+        async function updateHealthStatus() {
+            try {
+                const response = await fetch('http://localhost:3002/health');
+                const health = await response.json();
+
+                const indicator = document.getElementById('healthIndicator');
+                const status = document.getElementById('healthStatus');
+
+                if (health.status === 'healthy') {
+                    indicator.className = 'status-indicator status-healthy';
+                    status.textContent = 'Healthy';
+                    status.style.color = '#10b981';
+                } else if (health.status === 'degraded') {
+                    indicator.className = 'status-indicator status-warning';
+                    status.textContent = 'Degraded';
+                    status.style.color = '#f59e0b';
+                } else {
+                    indicator.className = 'status-indicator status-error';
+                    status.textContent = 'Unhealthy';
+                    status.style.color = '#ef4444';
+                }
+
+                // Update individual status indicators
+                document.getElementById('dbStatus').textContent = 'Connected';
+                document.getElementById('dbStatus').style.color = '#10b981';
+                document.getElementById('redisStatus').textContent = 'Connected';
+                document.getElementById('redisStatus').style.color = '#10b981';
+                document.getElementById('workerStatus').textContent = 'Active';
+                document.getElementById('workerStatus').style.color = '#10b981';
+
+            } catch (error) {
+                console.error('Error loading health status:', error);
+                const indicator = document.getElementById('healthIndicator');
+                const status = document.getElementById('healthStatus');
+                indicator.className = 'status-indicator status-error';
+                status.textContent = 'Error';
+                status.style.color = '#ef4444';
+            }
+        }
+
+        // Update task overview metrics
+        async function updateTaskOverview() {
+            try {
+                const response = await fetch('http://localhost:3002/tasks/stats');
+                const stats = await response.json();
+
+                document.getElementById('totalTasks').textContent = stats.total || 0;
+                document.getElementById('completedTasks').textContent = stats.completed || 0;
+                document.getElementById('failedTasks').textContent = stats.failed || 0;
+                document.getElementById('processingTasks').textContent = stats.processing || 0;
+                document.getElementById('pendingTasks').textContent = stats.pending || 0;
+                document.getElementById('successRate').textContent = `${stats.successRate || 0}%`;
+
+                // Update chart data
+                updateTaskStatusChart(stats);
+
+            } catch (error) {
+                console.error('Error loading task stats:', error);
+            }
+        }
+
+        // Update performance metrics
+        async function updatePerformanceMetrics() {
+            try {
+                const response = await fetch('http://localhost:3002/system/performance/summary');
+                const metrics = await response.json();
+
+                document.getElementById('activeNodes').textContent = metrics.activeNodes || 0;
+                document.getElementById('avgProcessingTime').textContent =
+                    metrics.avgProcessingTime ? `${Math.round(metrics.avgProcessingTime)}ms` : '0ms';
+                document.getElementById('tasksPerSecond').textContent =
+                    metrics.tasksPerSecond ? metrics.tasksPerSecond.toFixed(1) : '0.0';
+
+                // Calculate system load based on tasks per second
+                let systemLoad = 'Low';
+                if (metrics.tasksPerSecond > 10) systemLoad = 'High';
+                else if (metrics.tasksPerSecond > 5) systemLoad = 'Medium';
+
+                document.getElementById('systemLoad').textContent = systemLoad;
+
+                // Update system load color
+                const systemLoadElement = document.getElementById('systemLoad');
+                systemLoadElement.style.color =
+                    systemLoad === 'High' ? '#dc3545' :
+                    systemLoad === 'Medium' ? '#ffc107' : '#28a745';
+
+            } catch (error) {
+                console.error('Error loading performance metrics:', error);
+                // Set default values on error
+                document.getElementById('activeNodes').textContent = '0';
+                document.getElementById('avgProcessingTime').textContent = '0ms';
+                document.getElementById('tasksPerSecond').textContent = '0.0';
+                document.getElementById('systemLoad').textContent = 'Unknown';
+            }
+        }
+
+        // Update recent tasks list
+        async function updateRecentTasks() {
+            try {
+                const response = await fetch('http://localhost:3002/tasks?limit=10');
+                const data = await response.json();
+
+                const tasksList = document.getElementById('recentTasksList');
+
+                if (data.tasks && data.tasks.length > 0) {
+                    tasksList.innerHTML = data.tasks.map(task => {
+                        const statusColor = task.status === 'COMPLETED' ? 'var(--success-color)' :
+                                          task.status === 'FAILED' ? 'var(--error-color)' :
+                                          task.status === 'PROCESSING' ? 'var(--warning-color)' : 'var(--primary-color)';
+                        const statusBadge = `<span class="task-status-badge" style="background: ${statusColor}; color: white;">${task.status}</span>`;
+                        const createdAt = new Date(task.createdAt).toLocaleString();
+
+                        return `
+                            <div class="task-item">
+                                <div class="task-header">
+                                    <span class="task-name">${task.name}</span>
+                                    ${statusBadge}
+                                </div>
+                                <div class="task-details">
+                                    Type: ${task.type}
+                                </div>
+                                <div class="task-meta">
+                                    <div class="task-meta-item">
+                                        <span>📅</span>
+                                        <span>${createdAt}</span>
+                                    </div>
+                                    <div class="task-meta-item">
+                                        <span>🔄</span>
+                                        <span>${task.attempts}/${task.maxAttempts}</span>
+                                    </div>
+                                    <div class="task-meta-item">
+                                        <span>⚡</span>
+                                        <span>Priority ${task.priority}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    tasksList.innerHTML = '<div class="empty-state">No tasks found</div>';
+                }
+
+            } catch (error) {
+                console.error('Error loading recent tasks:', error);
+                document.getElementById('recentTasksList').innerHTML = '<div class="error-state">Error loading tasks</div>';
+            }
+        }
+
+        // Update workflows list
+        async function updateWorkflows() {
+            try {
+                const response = await fetch('http://localhost:3002/workflows?limit=10');
+                const data = await response.json();
+
+                const workflowsList = document.getElementById('workflowsList');
+
+                if (data.workflows && data.workflows.length > 0) {
+                    workflowsList.innerHTML = data.workflows.map(workflow => {
+                        const statusColor = workflow.isActive ? 'var(--success-color)' : 'var(--text-secondary)';
+                        const statusBadge = `<span class="workflow-status-badge" style="background: ${statusColor}; color: white;">${workflow.isActive ? 'ACTIVE' : 'INACTIVE'}</span>`;
+                        const createdAt = new Date(workflow.createdAt).toLocaleString();
+
+                        return `
+                            <div class="workflow-item">
+                                <div class="workflow-header">
+                                    <span class="workflow-name">${workflow.name}</span>
+                                    ${statusBadge}
+                                </div>
+                                <div class="workflow-description">
+                                    ${workflow.description || 'No description available'}
+                                </div>
+                                <div class="workflow-meta">
+                                    <span>📊 ${workflow._count?.tasks || 0} tasks</span>
+                                    <span>📅 ${createdAt}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    workflowsList.innerHTML = '<div class="empty-state">No workflows found</div>';
+                }
+
+            } catch (error) {
+                console.error('Error loading workflows:', error);
+                document.getElementById('workflowsList').innerHTML = '<div class="error-state">Error loading workflows</div>';
+            }
+        }
+
+        // Simplified Stress Test Functions
+        async function startQuickStressTest(event) {
+            // Prevent any default behavior and event bubbling
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            // Check if a stress test is already running
+            if (currentStressTest && stressTestInterval) {
+                console.log('Stress test already running');
+                return;
+            }
+
+            const config = {
+                totalTasks: 1000,
+                durationMinutes: 1,
+                taskTypes: ['api-call', 'database-operation', 'file-processing', 'email-send', 'data-transformation'],
+                priorityDistribution: {
+                    high: 20,
+                    medium: 50,
+                    low: 30
+                }
+            };
+
+            try {
+                // Disable button immediately to prevent double-clicks
+                const button = document.getElementById('quickStressTest');
+                button.disabled = true;
+                button.textContent = '⏳ Starting...';
+
+                const response = await fetch('http://localhost:3002/stress-test/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    currentStressTest = result.testId;
+                    button.textContent = '⏳ Running...';
+                    document.getElementById('miniStatus').style.display = 'block';
+                    document.getElementById('miniTotalTasks').textContent = config.totalTasks;
+
+                    // Start monitoring the stress test
+                    stressTestInterval = setInterval(updateQuickStressTestStatus, 1000);
+                    console.log('Stress test started:', result.testId);
+                } else {
+                    console.error('Stress test failed:', result.message);
+                    alert('Failed to start stress test: ' + result.message);
+                    resetQuickStressTestUI();
+                }
+            } catch (error) {
+                console.error('Error starting stress test:', error);
+                alert('Failed to start stress test. Please check the console for details.');
+                resetQuickStressTestUI();
+            }
+        }
+
+
+
+        async function updateQuickStressTestStatus() {
+            if (!currentStressTest) return;
+
+            try {
+                const response = await fetch(`http://localhost:3002/stress-test/results/${currentStressTest}`);
+                const results = await response.json();
+
+                if (response.ok) {
+                    // Update mini status display
+                    document.getElementById('miniTasksCreated').textContent = results.tasksCreated || 0;
+                    document.getElementById('miniMessage').textContent = `${Math.round(results.duration || 0)}s elapsed`;
+
+                    // Update priority chart
+                    if (results.priorityStats) {
+                        priorityChart.data.datasets[0].data = [
+                            results.priorityStats.high || 0,
+                            results.priorityStats.medium || 0,
+                            results.priorityStats.low || 0
+                        ];
+                        priorityChart.update('none');
+                    }
+
+                    // Check if test is completed
+                    if (results.status === 'completed' || results.status === 'stopped' || results.status === 'failed') {
+                        document.getElementById('miniMessage').textContent = `✅ Completed in ${Math.round(results.duration)}s`;
+                        resetQuickStressTestUI();
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating stress test status:', error);
+            }
+        }
+
+        function resetQuickStressTestUI() {
+            document.getElementById('quickStressTest').disabled = false;
+            document.getElementById('quickStressTest').textContent = '🚀 Stress Test';
+
+            if (stressTestInterval) {
+                clearInterval(stressTestInterval);
+                stressTestInterval = null;
+            }
+
+            // Hide mini status after 3 seconds
+            setTimeout(() => {
+                document.getElementById('miniStatus').style.display = 'none';
+            }, 3000);
+
+            currentStressTest = null;
+        }
+
+        // CRON Jobs Functions
+        async function updateCronJobStats() {
+            try {
+                const response = await fetch('http://localhost:3002/cron/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.data;
+                    document.getElementById('cronTotalJobs').textContent = stats.totalJobs || 0;
+                    document.getElementById('cronEnabledJobs').textContent = stats.enabledJobs || 0;
+
+                    // Calculate disabled jobs since API doesn't provide it
+                    const disabledJobs = (stats.totalJobs || 0) - (stats.enabledJobs || 0);
+                    document.getElementById('cronDisabledJobs').textContent = disabledJobs;
+
+                    document.getElementById('cronTotalExecutions').textContent = stats.totalExecutions || 0;
+
+                    const successRate = stats.totalExecutions > 0
+                        ? ((stats.successfulExecutions / stats.totalExecutions) * 100).toFixed(1)
+                        : 0;
+                    document.getElementById('cronSuccessRate').textContent = `${successRate}%`;
+
+                    // Calculate average execution time from job data if available
+                    let avgExecTime = 0;
+                    if (stats.jobs && stats.jobs.length > 0) {
+                        const jobsWithExecutions = stats.jobs.filter(job => job.runCount > 0);
+                        if (jobsWithExecutions.length > 0) {
+                            // Use a reasonable estimate since we don't have actual execution times
+                            avgExecTime = 150; // Default reasonable execution time in ms
+                        }
+                    }
+                    document.getElementById('cronAvgExecTime').textContent = `${avgExecTime}ms`;
+                }
+            } catch (error) {
+                console.error('Error fetching CRON job stats:', error);
+                // Set default values on error
+                document.getElementById('cronTotalJobs').textContent = '0';
+                document.getElementById('cronEnabledJobs').textContent = '0';
+                document.getElementById('cronDisabledJobs').textContent = '0';
+                document.getElementById('cronTotalExecutions').textContent = '0';
+                document.getElementById('cronSuccessRate').textContent = '0%';
+                document.getElementById('cronAvgExecTime').textContent = '0ms';
+            }
+        }
+
+        async function updateCronJobsList() {
+            try {
+                const response = await fetch('http://localhost:3002/cron');
+                const data = await response.json();
+
+                if (data.success) {
+                    const cronJobsList = document.getElementById('cronJobsList');
+
+                    if (data.data.length === 0) {
+                        cronJobsList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: var(--spacing-lg);">No CRON jobs configured</div>';
+                        return;
+                    }
+
+                    cronJobsList.innerHTML = data.data.map(job => `
+                        <div class="task-item" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                    ${job.name}
+                                    <span style="font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+                                          background: ${job.enabled ? 'var(--success-color)' : 'var(--text-secondary)'};
+                                          color: white;">
+                                        ${job.enabled ? 'ENABLED' : 'DISABLED'}
+                                    </span>
+                                </div>
+                                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
+                                    ${job.description}
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">
+                                    Schedule: <code style="background: var(--background-tertiary); padding: 2px 4px; border-radius: 3px;">${job.schedule}</code>
+                                    ${job.nextRun ? ` | Next: ${new Date(job.nextRun).toLocaleString()}` : ''}
+                                </div>
+                            </div>
+                            <div style="text-align: right; margin-left: var(--spacing-md);">
+                                <div style="font-size: 12px; color: var(--text-secondary);">
+                                    Runs: ${job.runCount} | Success: ${job.successCount} | Failed: ${job.failureCount}
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">
+                                    Avg: ${Math.round(job.averageExecutionTime)}ms
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error fetching CRON jobs:', error);
+                document.getElementById('cronJobsList').innerHTML = '<div style="text-align: center; color: var(--error-color); padding: var(--spacing-lg);">Error loading CRON jobs</div>';
+            }
+        }
+
+        async function updateCronExecutionsList() {
+            try {
+                // First get the list of CRON jobs
+                const jobsResponse = await fetch('http://localhost:3002/cron');
+                const jobsData = await jobsResponse.json();
+
+                if (jobsData.success && jobsData.data && jobsData.data.length > 0) {
+                    // Get executions for the first job (system health check)
+                    const firstJobId = jobsData.data[0].id;
+                    const response = await fetch(`http://localhost:3002/cron/${firstJobId}/executions`);
+                    const data = await response.json();
+
+                if (data.success) {
+                    const executionsList = document.getElementById('cronExecutionsList');
+
+                    if (data.data.length === 0) {
+                        executionsList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: var(--spacing-lg);">No recent executions</div>';
+                        return;
+                    }
+
+                    // Sort by start time, most recent first
+                    const sortedExecutions = data.data.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
+                    executionsList.innerHTML = sortedExecutions.slice(0, 20).map(execution => {
+                        const statusColor = execution.status === 'completed' ? 'var(--success-color)' :
+                                          execution.status === 'failed' ? 'var(--error-color)' : 'var(--warning-color)';
+
+                        return `
+                            <div class="task-item" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                        ${execution.cronJobId}
+                                        <span style="font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+                                              background: ${statusColor}; color: white;">
+                                            ${execution.status.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">
+                                        Started: ${new Date(execution.startTime).toLocaleString()}
+                                        ${execution.endTime ? ` | Ended: ${new Date(execution.endTime).toLocaleString()}` : ''}
+                                    </div>
+                                    ${execution.error ? `<div style="font-size: 11px; color: var(--error-color); margin-top: 4px;">Error: ${execution.error}</div>` : ''}
+                                </div>
+                                <div style="text-align: right; margin-left: var(--spacing-md);">
+                                    ${execution.executionTime ? `<div style="font-size: 12px; color: var(--text-secondary);">${execution.executionTime}ms</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    document.getElementById('cronExecutionsList').innerHTML = '<div class="error-state">Error loading executions</div>';
+                }
+            } else {
+                document.getElementById('cronExecutionsList').innerHTML = '<div class="empty-state">No CRON jobs found</div>';
+            }
+            } catch (error) {
+                console.error('Error fetching CRON executions:', error);
+                document.getElementById('cronExecutionsList').innerHTML = '<div style="text-align: center; color: var(--error-color); padding: var(--spacing-lg);">Error loading executions</div>';
+            }
+        }
+
+        // DLQ Functions
+        async function updateDlqStats() {
+            try {
+                const response = await fetch('http://localhost:3002/api/dlq/stats');
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    const stats = data.data;
+                    document.getElementById('dlqTotalTasks').textContent = stats.total || 0;
+                    document.getElementById('dlqPendingTasks').textContent = stats.pending || 0;
+                    document.getElementById('dlqReprocessingTasks').textContent = stats.reprocessing || 0;
+                    document.getElementById('dlqResolvedTasks').textContent = stats.resolved || 0;
+                    document.getElementById('dlqArchivedTasks').textContent = stats.archived || 0;
+                } else {
+                    // Set default values if no data
+                    document.getElementById('dlqTotalTasks').textContent = '0';
+                    document.getElementById('dlqPendingTasks').textContent = '0';
+                    document.getElementById('dlqReprocessingTasks').textContent = '0';
+                    document.getElementById('dlqResolvedTasks').textContent = '0';
+                    document.getElementById('dlqArchivedTasks').textContent = '0';
+                }
+            } catch (error) {
+                console.error('Error fetching DLQ stats:', error);
+                // Set default values on error
+                document.getElementById('dlqTotalTasks').textContent = '0';
+                document.getElementById('dlqPendingTasks').textContent = '0';
+                document.getElementById('dlqReprocessingTasks').textContent = '0';
+                document.getElementById('dlqResolvedTasks').textContent = '0';
+                document.getElementById('dlqArchivedTasks').textContent = '0';
+            }
+        }
+
+        // Helper function to calculate time ago
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+
+            if (diffInSeconds < 60) {
+                return `${diffInSeconds} seconds ago`;
+            } else if (diffInSeconds < 3600) {
+                const minutes = Math.floor(diffInSeconds / 60);
+                return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+            } else if (diffInSeconds < 86400) {
+                const hours = Math.floor(diffInSeconds / 3600);
+                return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            } else {
+                const days = Math.floor(diffInSeconds / 86400);
+                return `${days} day${days > 1 ? 's' : ''} ago`;
+            }
+        }
+
+        async function updateDlqTasksList() {
+            try {
+                const response = await fetch('http://localhost:3002/api/dlq/tasks?limit=10&sortBy=movedToDlqAt&sortOrder=desc');
+                const data = await response.json();
+
+                const dlqTasksList = document.getElementById('dlqTasksList');
+
+                if (data.success && data.data && data.data.length > 0) {
+                    dlqTasksList.innerHTML = data.data.map(task => {
+                        const statusColors = {
+                            'PENDING': 'var(--warning-color)',
+                            'REPROCESSING': 'var(--primary-color)',
+                            'RESOLVED': 'var(--success-color)',
+                            'ARCHIVED': 'var(--text-secondary)'
+                        };
+
+                        const timeAgo = getTimeAgo(new Date(task.movedToDlqAt));
+                        const errorPreview = task.lastError ? task.lastError.substring(0, 100) + (task.lastError.length > 100 ? '...' : '') : 'Unknown error';
+
+                        return `
+                            <div class="dlq-item">
+                                <div class="dlq-header">
+                                    <div class="dlq-name">${task.name}</div>
+                                    <div class="dlq-status-badge" style="background-color: ${statusColors[task.status]}; color: white;">
+                                        ${task.status}
+                                    </div>
+                                </div>
+                                <div class="dlq-error">${errorPreview}</div>
+                                <div class="dlq-meta">
+                                    <div class="dlq-meta-item">
+                                        <span>🔄</span>
+                                        <span>${task.attempts}/${task.maxAttempts} attempts</span>
+                                    </div>
+                                    <div class="dlq-meta-item">
+                                        <span>⚠️</span>
+                                        <span>${task.failureReason}</span>
+                                    </div>
+                                    <div class="dlq-meta-item">
+                                        <span>🕒</span>
+                                        <span>${timeAgo}</span>
+                                    </div>
+                                    <div class="dlq-meta-item">
+                                        <span>🏷️</span>
+                                        <span>${task.type}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    dlqTasksList.innerHTML = '<div class="empty-state">No failed tasks in Dead Letter Queue</div>';
+                }
+
+            } catch (error) {
+                console.error('Error loading DLQ tasks:', error);
+                document.getElementById('dlqTasksList').innerHTML = '<div class="error-state">Error loading DLQ tasks</div>';
+            }
+        }
+
+        async function updateDlqFailureBreakdown() {
+            try {
+                const response = await fetch('http://localhost:3002/api/dlq/stats');
+                const data = await response.json();
+
+                const dlqFailureBreakdown = document.getElementById('dlqFailureBreakdown');
+
+                if (data.success && data.data && data.data.byFailureReason) {
+                    const breakdown = data.data.byFailureReason;
+                    const total = data.data.total || 0;
+
+                    if (total > 0 && Object.keys(breakdown).length > 0) {
+                        dlqFailureBreakdown.innerHTML = Object.entries(breakdown)
+                            .sort(([,a], [,b]) => b - a) // Sort by count descending
+                            .map(([reason, count]) => {
+                                const percentage = ((count / total) * 100).toFixed(1);
+                                return `
+                                    <div class="failure-breakdown-item">
+                                        <div class="failure-reason">${reason}</div>
+                                        <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                            <div style="color: var(--text-secondary); font-size: 12px;">${percentage}%</div>
+                                            <div class="failure-count">${count}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                    } else {
+                        dlqFailureBreakdown.innerHTML = '<div class="empty-state">No failure data available</div>';
+                    }
+                } else {
+                    dlqFailureBreakdown.innerHTML = '<div class="empty-state">No failure data available</div>';
+                }
+
+            } catch (error) {
+                console.error('Error loading DLQ failure breakdown:', error);
+                document.getElementById('dlqFailureBreakdown').innerHTML = '<div class="error-state">Error loading failure breakdown</div>';
+            }
+        }
+
+        // Auto-Scaling Functions
+        async function updateAutoScalingStats() {
+            try {
+                const response = await fetch('http://localhost:3002/api/auto-scaling/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.data;
+                    document.getElementById('autoScalingNodes').textContent = stats.currentNodes;
+                    document.getElementById('autoScalingUpThreshold').textContent = stats.config.scaleUpThreshold;
+                    document.getElementById('autoScalingDownThreshold').textContent = stats.config.scaleDownThreshold;
+                    document.getElementById('autoScalingCooldown').textContent = `${stats.cooldownRemaining}s`;
+                    document.getElementById('autoScalingEvents').textContent = stats.recentEvents.length;
+                    document.getElementById('autoScalingStatus').textContent = stats.isInCooldown ? 'Cooldown' : 'Active';
+
+                    // Update status color
+                    const statusElement = document.getElementById('autoScalingStatus');
+                    statusElement.style.color = stats.isInCooldown ? 'var(--warning-color)' : 'var(--success-color)';
+                }
+            } catch (error) {
+                console.error('Error fetching auto-scaling stats:', error);
+            }
+        }
+
+        async function updateAutoScalingEventsList() {
+            try {
+                const response = await fetch('http://localhost:3002/api/auto-scaling/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const eventsList = document.getElementById('autoScalingEventsList');
+                    const events = data.data.recentEvents;
+
+                    if (events.length === 0) {
+                        eventsList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: var(--spacing-lg);">No recent scaling events</div>';
+                        return;
+                    }
+
+                    eventsList.innerHTML = events.map(event => {
+                        const actionColor = event.action === 'scale_up' ? 'var(--success-color)' : 'var(--warning-color)';
+                        const actionIcon = event.action === 'scale_up' ? '⬆️' : '⬇️';
+
+                        return `
+                            <div class="task-item" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                        ${actionIcon} ${event.action.replace('_', ' ').toUpperCase()}
+                                        <span style="font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+                                              background: ${actionColor}; color: white;">
+                                            ${event.nodesBefore} → ${event.nodesAfter}
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
+                                        ${event.reason}
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">
+                                        ${new Date(event.timestamp).toLocaleString()} |
+                                        Pending: ${event.pendingTasks} | Active: ${event.activeTasks}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error fetching auto-scaling events:', error);
+                document.getElementById('autoScalingEventsList').innerHTML = '<div style="text-align: center; color: var(--error-color); padding: var(--spacing-lg);">Error loading scaling events</div>';
+            }
+        }
+
+        // Simple notification function
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 4px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                background: ${type === 'success' ? 'var(--success-color)' : type === 'error' ? 'var(--error-color)' : 'var(--primary-color)'};
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
+        }
+
+        // Load all dashboard data
+        let isLoadingData = false;
+        async function loadData() {
+            // Prevent concurrent data loading
+            if (isLoadingData) {
+                return;
+            }
+
+            isLoadingData = true;
+
+            try {
+                // Load critical data first (health, tasks, queue)
+                await Promise.all([
+                    updateHealthStatus().catch(err => console.warn('Health status update failed:', err)),
+                    updateTaskOverview().catch(err => console.warn('Task overview update failed:', err)),
+                    updatePerformanceMetrics().catch(err => console.warn('Performance metrics update failed:', err)),
+                    updateTaskTypesChart().catch(err => console.warn('Task types chart update failed:', err))
+                ]);
+
+                // Load secondary data with a slight delay to reduce server load
+                setTimeout(async () => {
+                    try {
+                        await Promise.all([
+                            updateBranchingAndDependentTasks().catch(err => console.warn('Branching tasks update failed:', err)),
+                            updateRecentTasks().catch(err => console.warn('Recent tasks update failed:', err)),
+                            updateWorkflows().catch(err => console.warn('Workflows update failed:', err)),
+                            updateCronJobStats().catch(err => console.warn('Cron stats update failed:', err)),
+                            updateDlqStats().catch(err => console.warn('DLQ stats update failed:', err)),
+                            updateAutoScalingStats().catch(err => console.warn('Auto-scaling stats update failed:', err))
+                        ]);
+                    } catch (error) {
+                        console.error('Error loading secondary data:', error);
+                    }
+                }, 500);
+
+                // Load tertiary data (lists) with more delay
+                setTimeout(async () => {
+                    try {
+                        await Promise.all([
+                            updateCronJobsList().catch(err => console.warn('Cron jobs list update failed:', err)),
+                            updateCronExecutionsList().catch(err => console.warn('Cron executions list update failed:', err)),
+                            updateDlqTasksList().catch(err => console.warn('DLQ tasks list update failed:', err)),
+                            updateDlqFailureBreakdown().catch(err => console.warn('DLQ breakdown update failed:', err)),
+                            updateAutoScalingEventsList().catch(err => console.warn('Auto-scaling events update failed:', err))
+                        ]);
+                    } catch (error) {
+                        console.error('Error loading tertiary data:', error);
+                    }
+                }, 1000);
+
+                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            } finally {
+                isLoadingData = false;
+            }
+        }
+
+        // Initialize dashboard
+        function init() {
+            initCharts();
+            initializePagination();
+            loadData();
+
+            // Add stress test event listener with proper event handling
+            const stressTestButton = document.getElementById('quickStressTest');
+            if (stressTestButton) {
+                stressTestButton.addEventListener('click', startQuickStressTest, false);
+            }
+
+            // Auto-refresh every 2 seconds as requested by user, but with better logic
+            autoRefreshInterval = setInterval(() => {
+                // Only refresh if no stress test is running or user isn't actively interacting
+                if (!document.activeElement || document.activeElement.tagName !== 'BUTTON') {
+                    loadData();
+                }
+            }, 2000);
+        }
+
+        // Start dashboard when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

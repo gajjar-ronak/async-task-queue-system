@@ -1,0 +1,204 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+
+  @@map("workflows")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  workflowId  String?
+  name        String
+  type        String
+  payload     Json?
+  status      TaskStatus @default(PENDING)
+  priority    Int        @default(0)
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(3)
+  delay       Int?       @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+
+  workflow    Workflow?  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  logs        TaskLog[]
+
+  @@map("tasks")
+}
+
+model TaskLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  level     LogLevel @default(INFO)
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_logs")
+}
+
+model Node {
+  id            String   @id
+  hostname      String
+  ipAddress     String
+  port          Int
+  status        String   @default("active") // active, inactive, maintenance
+  cpuUsage      Float    @default(0)
+  memoryUsage   Float    @default(0)
+  taskCount     Int      @default(0)
+  lastHeartbeat DateTime @default(now())
+  version       String   @default("1.0.0")
+  capabilities  Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("nodes")
+}
+
+model PerformanceMetric {
+  id                String   @id @default(cuid())
+  nodeId            String?
+  avgProcessingTime Float    // in milliseconds
+  tasksPerSecond    Float
+  totalTasks        Int
+  successfulTasks   Int
+  failedTasks       Int
+  timestamp         DateTime @default(now())
+  periodStart       DateTime
+  periodEnd         DateTime
+
+  @@map("performance_metrics")
+}
+
+model DeadLetterTask {
+  id                String   @id @default(cuid())
+  originalTaskId    String   @unique // Reference to the original task
+  workflowId        String?
+  name              String
+  type              String
+  payload           Json?
+  priority          Int      @default(0)
+  attempts          Int      // Number of attempts made before failure
+  maxAttempts       Int      // Max attempts that were configured
+
+  // Failure information
+  lastError         String   // Last error message
+  lastErrorStack    String?  // Last error stack trace
+  failureReason     String?  // Human-readable failure reason
+
+  // Timing information
+  originalCreatedAt DateTime // When the original task was created
+  firstFailedAt     DateTime // When the task first failed
+  movedToDlqAt      DateTime @default(now()) // When moved to DLQ
+
+  // Retry history as JSON
+  retryHistory      Json?    // Array of retry attempts with timestamps and errors
+
+  // Processing metadata
+  processingMetadata Json?   // Additional metadata from processing attempts
+
+  // DLQ management
+  status            DlqStatus @default(PENDING)
+  reprocessedAt     DateTime?
+  reprocessedBy     String?  // User or system that triggered reprocessing
+  notes             String?  // Admin notes about the failure
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("dead_letter_tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum DlqStatus {
+  PENDING      // Waiting in DLQ
+  REPROCESSING // Currently being reprocessed
+  RESOLVED     // Successfully reprocessed
+  ARCHIVED     // Permanently archived (won't be reprocessed)
+}
+
+model ScalingEvent {
+  id            String      @id @default(cuid())
+  eventType     ScalingEventType
+  nodeId        String?     // Node that was affected (if applicable)
+  triggerReason String      // Why the scaling event occurred
+  queueSize     Int?        // Queue size at the time of scaling
+  activeNodes   Int         // Number of active nodes after the event
+  targetNodes   Int?        // Target number of nodes (for scaling operations)
+
+  // Metadata about the scaling decision
+  metadata      Json?       // Additional context (CPU usage, memory, etc.)
+
+  // Timing information
+  timestamp     DateTime    @default(now())
+  duration      Int?        // Duration of the scaling operation in milliseconds
+
+  // Status tracking
+  status        ScalingEventStatus @default(INITIATED)
+  errorMessage  String?     // Error message if scaling failed
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("scaling_events")
+}
+
+enum ScalingEventType {
+  SCALE_UP          // Adding new worker nodes
+  SCALE_DOWN        // Removing worker nodes
+  NODE_START        // Individual node startup
+  NODE_STOP         // Individual node shutdown
+  NODE_FAILURE      // Node failed/crashed
+  NODE_RECOVERY     // Node recovered from failure
+  AUTO_SCALE_UP     // Automatic scaling up triggered
+  AUTO_SCALE_DOWN   // Automatic scaling down triggered
+  MANUAL_SCALE      // Manual scaling operation
+  HEALTH_CHECK      // Health check related event
+}
+
+enum ScalingEventStatus {
+  INITIATED         // Scaling event started
+  IN_PROGRESS       // Scaling operation in progress
+  COMPLETED         // Scaling completed successfully
+  FAILED            // Scaling failed
+  CANCELLED         // Scaling was cancelled
+  TIMEOUT           // Scaling timed out
+}

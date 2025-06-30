@@ -1,0 +1,49 @@
+{
+  "name": "distributed-async-task-worker",
+  "version": "1.0.0",
+  "description": "Distributed async task worker system with separate app and worker services",
+  "private": true,
+  "workspaces": [
+    "services/app-service",
+    "services/worker-service",
+    "packages/shared"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspaces",
+    "build:app": "npm run build --workspace=services/app-service",
+    "build:worker": "npm run build --workspace=services/worker-service",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "start:app": "npm run start:dev --workspace=services/app-service",
+    "start:worker": "npm run start:dev --workspace=services/worker-service",
+    "start:all": "concurrently \"npm run start:app\" \"npm run start:worker\"",
+    "dev": "npm run start:all",
+    "test": "npm run test --workspaces",
+    "test:app": "npm run test --workspace=services/app-service",
+    "test:worker": "npm run test --workspace=services/worker-service",
+    "test:unit": "npm run test --workspaces",
+    "test:e2e": "npm run test:e2e --workspaces",
+    "test:e2e:app": "npm run test:e2e --workspace=services/app-service",
+    "test:e2e:worker": "npm run test:e2e --workspace=services/worker-service",
+    "test:coverage": "npm run test:cov --workspaces",
+    "test:watch": "npm run test:watch --workspaces",
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "lint": "npm run lint --workspaces",
+    "format": "npm run format --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules",
+    "redis:start": "./scripts/start-redis.sh",
+    "prisma:generate": "dotenv -- prisma generate --schema=packages/shared/prisma/schema.prisma",
+    "prisma:push": "dotenv -- prisma db push --schema=packages/shared/prisma/schema.prisma",
+    "prisma:studio": "dotenv -- prisma studio --schema=packages/shared/prisma/schema.prisma",
+    "prisma:migrate": "dotenv -- prisma migrate dev --schema=packages/shared/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^8.0.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
