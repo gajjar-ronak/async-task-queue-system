@@ -22,6 +22,12 @@ This system provides a robust solution for managing asynchronous tasks in distri
 
 ## 🚀 Quick Start
 
+## Prerequisites
+
+Before running this project, make sure you have the following installed:
+
+- [Node.js] (v22.16.x or later recommended)
+  
 ### Option 1: Local Development (Recommended for Testing)
 
 ```bash
